@@ -1,9 +1,6 @@
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
 
 public class SocketWrapper {
@@ -24,16 +21,64 @@ public class SocketWrapper {
             out = new PrintWriter(socket.getOutputStream(), true);
     }
 
-    public void send(String data) {
+    public void sendln(String data) {
         out.println(data);
     }
+    public void send(String data) {
+        out.print(data);
+        out.flush();
+    }
 
-    public String receive() {
+    public int readBytes(byte[] buf) {
+        try {
+            InputStream s = socket.getInputStream();
+            return s.read(buf);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    public void sendBytes(byte[] buf, int length) {
+        try {
+            OutputStream s = socket.getOutputStream();
+            s.write(buf, 0, length);
+            s.flush();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    public String receiveLine() {
         try {
             return in.readLine();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+    public String receiveAll() {
+        return receiveAll(null);
+    }
+
+    public String receiveAll(int[] out) {
+        StringBuilder sb = new StringBuilder();
+        if (out == null || out.length < 1) {
+            out = new int[1];
+        }
+
+        try {
+            String line;
+            out[0] = 0;
+            while ((line = in.readLine()) != null) {
+                sb.append(line).append("\n");
+                out[0] += line.length() + 1; // line length + new line
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return sb.toString();
     }
 
     public void close() {
@@ -58,12 +103,5 @@ public class SocketWrapper {
         }
 
     }
-
-
-
-
-
-
-
 
 }

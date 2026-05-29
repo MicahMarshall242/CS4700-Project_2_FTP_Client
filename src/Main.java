@@ -62,9 +62,6 @@ public class Main {
               //  System.out.println("local file");
             }
         }
-        //  $ ./4700ftp [operation] [param1] [param2]
-        // url format: ftp://[USER[:PASSWORD]@]HOST[:PORT]/PATH
-
-        //FTPConnection.
+        conn.shutDown();
     }
 }
