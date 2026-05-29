@@ -1,63 +1,46 @@
 import java.io.*;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.net.URISyntaxException;
 import java.util.List;
 
 public class FTPConnection {
     private SocketWrapper controlChannel; // FTP Requests *sending* such as USER <username>\r\n
     private SocketWrapper dataChannel; //
     private static final int controlChannelDefaultPort = 21;
-    private String user;
-    private String pass;
-    private String host;
-    private String path;
-    private int port;
-    private static final boolean print = false;
-    private int[] bytesOut;
-    private int[] bytesIn;
 
-    public FTPConnection() {
-    }
+    private static final boolean print = true;
 
 
-    public void serverExec(String cmd, URI external, File local) {
-        serverExec(cmd, external, local, false);
-
-    }
-
-    // from           to
-    public void serverExec(String cmd, URI external, File local, boolean swapInput) {
-        String exPath = external.getPath();
-        String locPath = null;
-        if (local != null) {
-            locPath = local.getPath();
+    public void dispatch(String cmd, String remoteURL, String localPath, boolean download) {
+        URI handle;
+        try {
+            handle = establishConnection(remoteURL);
+        } catch (URISyntaxException e) {
+            System.out.println("Bad path.");
+            throw new RuntimeException(e);
         }
+        String remotePath = handle.getPath();
 
         switch (cmd) {
             case "ls": {
                 // LIST
-                send("LIST " + exPath);
+                send("LIST " + remotePath);
                 int[] out = {-1};
                 System.out.println(dataChannel.receiveAll(out)); // ls is string data
                 break;
             }
-            case "rm": {send("DELE " + exPath);break;}
-            case "mkdir": {send("MKD " + exPath);break;}
-            case "rmdir": {send("RMD " + exPath);break;}
+            case "rm": {send("DELE " + remotePath);break;}
+            case "mkdir": {send("MKD " + remotePath);break;}
+            case "rmdir": {send("RMD " + remotePath);break;}
             case "mv": {
                 // down/upload then delete
             }
             case "cp": {
-                assert local != null;
-                if (swapInput) {
-                    // upload op
-                   upload(locPath, exPath);
+                if (download) {
+                    download(remotePath, localPath);
                 } else {
-                    // download op
-                    download(exPath, locPath);
+                    upload(remotePath, localPath);
                 }
-
                 break;
             }
             default: {
@@ -67,10 +50,10 @@ public class FTPConnection {
     }
 
 
-    private void download(String fromPath, String toPath) {
-        send("RETR " + fromPath, true); // tell the server we want to download
+    private void download(String remotePath, String localPath) {
+        send("RETR " + remotePath, true); // tell the server we want to download
         try {
-            File local = new File(toPath);
+            File local = new File(localPath);
             boolean success = local.createNewFile(); // make local file
             if (success) {
                 // begin reading and writing into the file
@@ -82,7 +65,7 @@ public class FTPConnection {
                 }
                 fo.close();
             } else {
-                throw new RuntimeException("File could not create");
+                throw new RuntimeException("File could not be created");
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -90,10 +73,10 @@ public class FTPConnection {
 
     }
 
-    private void upload(String filepath, String destination) {
-        send("STOR " + path);
+    private void upload(String remotePath, String localPath) {
+        send("STOR " + remotePath);
         try {
-            File local = new File(filepath);
+            File local = new File(localPath);
             FileInputStream fi = new FileInputStream(local);
             byte[] buffer = new byte[8192]; // large enough      (-_-(-_-)-_-)
             int bytesRead;
@@ -107,81 +90,49 @@ public class FTPConnection {
         }
     }
 
-
-    public void execOut(String cmd, File local, URI external) {
-        verify(local);
-        establishConnection(external);
-        serverExec(cmd, external, local, true);
-    }
-
-    public void execOut(String cmd, URI external) {
-        establishConnection(external);
-        serverExec(cmd, external, null);
-    }
-
-    public void execIn(String cmd, File local, URI external) {
-        verify(local);
-        establishConnection(external);
-        serverExec(cmd, external, local, false);
-    }
-
-    // questionable if needed
-    public void execIn(String cmd, File local) {
-        verify(local);
-    }
-
-
-    private void verify(File local) {
-        assert (local.exists());
-    }
-
     public void shutDown() {
         dataChannel.close();
         send("QUIT");
         controlChannel.close();
     }
 
-    private void establishConnection(URI externalHandle) {
-        port = externalHandle.getPort();
+    private URI establishConnection(String externalPath) throws URISyntaxException {
+        URI externalHandle = new URI(externalPath);
+        String userpass = externalHandle.getUserInfo();
+        String user;
+        String pass;
+        String host = externalHandle.getHost();
+
+        int port = externalHandle.getPort();
         if (port < 0) {
             port = controlChannelDefaultPort;
         }
 
-        String username = externalHandle.getUserInfo();
-        if (username == null) { // no user provided, use anonymous with no pass
+        if (userpass == null) { // no user provided, use anonymous with no pass
             user = "anonymous";
             pass = "";
-        } else if (username.contains(":")) {   // user and password provided
-            user = username.split(":")[0];
-            pass = username.split(":")[1];
+        } else if (userpass.contains(":")) {   // user and password provided
+            user = userpass.split(":")[0];
+            pass = userpass.split(":")[1];
         } else {    // user with no pass provided
-            user = username;
+            user = userpass;
             pass = "";
         }
 
-        host = externalHandle.getHost();
-        path = externalHandle.getPath();
-
-//        System.out.println("- - - - - - - - - - - - -");
-//        System.out.println(user);
-//        System.out.println(pass);
-//        System.out.println(host);
-//        System.out.println(port);
-//        System.out.println(path);
         try {
-            //            System.out.println("- - - - - - - - - - - - -");
-            openControlChannel();
+//            System.out.println("- - - - - - - - - - - - -");
+            openControlChannel(host, port, user, pass);
 //            System.out.println("- - - - - - - - - - - - -");
             openDataChannel();
         } catch (IOException e) {
             System.out.println("An error occurred when opening communication channels.");
             throw new RuntimeException(e);
         }
-
+        return externalHandle;
 
     }
 
-    private void openControlChannel() throws IOException {
+    private void openControlChannel(String host, int port, String user, String pass) throws IOException {
         //System.out.println("opening control channel...");
         controlChannel = new SocketWrapper(host, port);
         List<String> inits = List.of(
