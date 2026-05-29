@@ -16,6 +16,8 @@ JC = javac
 
 # Include all your .java  file names here
 CLASSES = \
+		Main.java \
+		FtpConnection.Java
 
 
 
