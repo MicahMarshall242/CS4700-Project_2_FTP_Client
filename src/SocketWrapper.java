@@ -1,34 +1,35 @@
-import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
 import java.io.*;
 import java.net.Socket;
 
+/**
+ * This class serves to wrap the TCP sockets that connect to servers, and provides neat abstractions to reduce
+ * boilerplate. SocketWrappers behave almost like an enhanced Socket.
+ */
 public class SocketWrapper {
-    private Socket socket;
-    private  BufferedReader in;
-    private  PrintWriter out;
-    private final String host;
-    private final int port;
+    private final Socket socket;
+    private final BufferedReader in;
+    private final PrintWriter out;
 
+    /**
+        Constructs a SocketWrapper instance.
+     */
     public SocketWrapper(String host, int port) throws IOException {
-        this.host = host;
-        this.port = port;
-        socket = //SSLSocketFactory.getDefault().createSocket(host, port);
-                    new Socket(host, port);
-            // System.out.println(socket.isConnected());
-           // socket.startHandshake();
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            out = new PrintWriter(socket.getOutputStream(), true);
+        socket = new Socket(host, port);
+        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        out = new PrintWriter(socket.getOutputStream(), true);
     }
 
+    /**
+     * sends string data to the server
+     * @param data
+     */
     public void sendln(String data) {
         out.println(data);
     }
-    public void send(String data) {
-        out.print(data);
-        out.flush();
-    }
 
+    /**
+     * Reads raw bytes into the provided buffer.
+     */
     public int readBytes(byte[] buf) {
         try {
             InputStream s = socket.getInputStream();
@@ -38,7 +39,9 @@ public class SocketWrapper {
         }
 
     }
-
+    /**
+        Sends raw bytes to the internal output stream.
+     */
     public void sendBytes(byte[] buf, int length) {
         try {
             OutputStream s = socket.getOutputStream();
@@ -50,6 +53,9 @@ public class SocketWrapper {
 
     }
 
+    /**
+     * Interprets a single line from the input stream as text.
+     */
     public String receiveLine() {
         try {
             return in.readLine();
@@ -57,10 +63,10 @@ public class SocketWrapper {
             throw new RuntimeException(e);
         }
     }
-    public String receiveAll() {
-        return receiveAll(null);
-    }
 
+    /**
+     * Reads all data present in the input stream as text.
+     */
     public String receiveAll(int[] out) {
         StringBuilder sb = new StringBuilder();
         if (out == null || out.length < 1) {
@@ -81,6 +87,9 @@ public class SocketWrapper {
         return sb.toString();
     }
 
+    /**
+     * closes the underlying socket.
+     */
     public void close() {
         try {
             socket.close();
@@ -88,20 +97,4 @@ public class SocketWrapper {
             throw new RuntimeException(e);
         }
     }
-
-    public void makeTCP() {
-        try {
-            SSLSocketFactory fac =  (SSLSocketFactory) SSLSocketFactory.getDefault();
-            SSLSocket s = (SSLSocket) fac.createSocket(socket, host, port, true);
-            s.startHandshake();
-
-            in = new BufferedReader(new InputStreamReader(s.getInputStream()));
-            out = new PrintWriter(s.getOutputStream(), true);
-            socket = s;
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-    }
-
 }

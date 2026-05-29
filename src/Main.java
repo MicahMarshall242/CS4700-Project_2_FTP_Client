@@ -4,13 +4,16 @@ import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.List;
 
+/**
+ * The main driver class
+ */
 public class Main {
     public static void main(String[] args) throws URISyntaxException {
         if (args.length < 2) {
             throw new IllegalStateException("Args needs to have a command and at least 1 parameter.");
         }
 
-        // dynamic index variable
+        // dynamic indexing variable for args
         int argPointer = 0;
         String cmd = args[argPointer++]; // cmd guaranteed
         String arg1 = args[argPointer++]; // arg1 guaranteed
